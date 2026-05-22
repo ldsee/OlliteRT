@@ -54,6 +54,7 @@
   <string name="notification_title_fail" translatable="false">Model download failed</string>
   <string name="notification_title_success" translatable="false">Model download succeeded</string>
   <string name="ok" translatable="false">OK</string>
+  <string name="enabled" translatable="false">Enabled</string>
   <string name="results" translatable="false">Results</string>
   <string name="run_benchmark" translatable="false">Run benchmark</string>
   <string name="run_benchmark_confirmation_msg" translatable="false">This process typically takes several minutes and cannot be interrupted once started. Would you like to proceed?</string>
@@ -923,6 +924,7 @@
   <string name="benchmark_stat_prefill_tokens" translatable="false">Prefill tokens</string>
   <string name="benchmark_stat_decode_tokens" translatable="false">Decode tokens</string>
   <string name="benchmark_stat_number_of_runs" translatable="false">Number of runs</string>
+  <string name="benchmark_stat_speculative_decoding" translatable="false">Speculative decoding</string>
   <string name="benchmark_stat_app_version" translatable="false">App version</string>
   <string name="benchmark_stat_prefill_speed" translatable="false">Prefill speed</string>
   <string name="benchmark_stat_decode_speed" translatable="false">Decode speed</string>

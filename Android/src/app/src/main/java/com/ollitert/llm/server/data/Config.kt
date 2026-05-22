@@ -103,6 +103,7 @@ open class Config(
   open val requiresModelUpdate: Boolean = false,
 ) {
   var subtitle: String? = null
+  var enabled: Boolean = true
 }
 
 /** Configuration setting for a label. */
