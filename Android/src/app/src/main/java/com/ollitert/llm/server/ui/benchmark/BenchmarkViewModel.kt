@@ -142,6 +142,7 @@ constructor(
       Log.d(TAG, "Running benchmark: ${parts.joinToString("\n")}")
 
       try {
+      ExperimentalFlags.enableSpeculativeDecoding = speculativeDecoding
       val startMs = System.currentTimeMillis()
       val prefillSpeeds = mutableListOf<Double>()
       val decodeSpeeds = mutableListOf<Double>()
@@ -167,7 +168,6 @@ constructor(
           else -> Backend.CPU()
         }
       val modelPath = model.getPath(context = appContext)
-      ExperimentalFlags.enableSpeculativeDecoding = speculativeDecoding
       for (i in 0 until runCount) {
         Log.d(TAG, "Start running #$i...")
         val benchmarkInfo =
