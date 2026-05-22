@@ -320,6 +320,7 @@ class ModelLifecycle(
         model.downloadFileName = updatable.fileName
         model.totalBytes = oldPath.length()
         model.updatable = true
+        model.applyUpdateHints(context.getString(R.string.config_hint_requires_model_update))
         return
       }
     }

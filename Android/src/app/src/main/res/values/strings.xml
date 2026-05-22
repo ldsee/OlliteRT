@@ -867,6 +867,9 @@
   <string name="inference_settings_allow_thinking">Allow Thinking</string>
   <string name="inference_settings_thinking_supported">Enables the model\'s thinking mode for step-by-step reasoning</string>
   <string name="inference_settings_thinking_unsupported">This model does not support thinking mode</string>
+  <string name="inference_settings_spec_dec_label" translatable="false">Speculative Decoding (MTP)</string>
+  <string name="inference_settings_spec_dec_supported" translatable="false">Predicts multiple tokens at once for faster decode speed without quality loss</string>
+  <string name="inference_settings_spec_dec_unsupported" translatable="false">This model does not support speculative decoding</string>
   <string name="inference_settings_accelerator">Accelerator</string>
   <string name="inference_settings_accelerator_only">This model only supports %1$s acceleration</string>
 
@@ -904,6 +907,7 @@
   <string name="config_label_support_tools" translatable="false">Support\ntools</string>
   <string name="config_label_enable_thinking" translatable="false">Enable thinking</string>
   <string name="config_label_enable_speculative_decoding" translatable="false">Speculative decoding</string>
+  <string name="config_hint_requires_model_update" translatable="false">Requires model update to take effect</string>
   <string name="config_label_accelerator" translatable="false">Accelerator</string>
   <string name="config_label_vision_accelerator" translatable="false">Vision accelerator</string>
   <string name="config_label_compatible_accelerators" translatable="false">Compatible accelerators</string>

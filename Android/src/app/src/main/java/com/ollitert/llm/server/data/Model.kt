@@ -273,6 +273,12 @@ data class Model(
     this.totalBytes = this.sizeInBytes + this.extraDataFiles.sumOf { it.sizeInBytes }
   }
 
+  fun applyUpdateHints(hint: String) {
+    for (config in configs) {
+      if (config.requiresModelUpdate) config.subtitle = hint
+    }
+  }
+
   fun getPath(context: Context, fileName: String = downloadFileName): String {
     val externalDir = context.getExternalFilesDir(null)?.absolutePath
       ?: throw IllegalStateException("External storage unavailable — cannot access model files")

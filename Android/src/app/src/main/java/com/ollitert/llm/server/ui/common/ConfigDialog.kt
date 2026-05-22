@@ -297,6 +297,13 @@ fun BooleanSwitchRow(config: BooleanSwitchConfig, values: SnapshotStateMap<Strin
   val switchValue = values[config.key.id] as? Boolean ?: false
   Column(modifier = Modifier.fillMaxWidth().semantics(mergeDescendants = true) {}) {
     Text(stringResource(config.key.labelResId), style = MaterialTheme.typography.titleSmall)
+    config.subtitle?.let {
+      Text(
+        text = it,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+    }
     Switch(checked = switchValue, onCheckedChange = { values[config.key.id] = it })
   }
 }

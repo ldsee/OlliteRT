@@ -100,7 +100,10 @@ open class Config(
   // Changes on any configs with this field set to true will automatically trigger a model
   // re-initialization.
   open val needReinitialization: Boolean = true,
-)
+  open val requiresModelUpdate: Boolean = false,
+) {
+  var subtitle: String? = null
+}
 
 /** Configuration setting for a label. */
 class LabelConfig(override val key: ConfigKey, override val defaultValue: String = "") :
@@ -150,11 +153,13 @@ class BooleanSwitchConfig(
   override val key: ConfigKey,
   override val defaultValue: Boolean,
   override val needReinitialization: Boolean = true,
+  override val requiresModelUpdate: Boolean = false,
 ) :
   Config(
     key = key,
     defaultValue = defaultValue,
     valueType = ValueType.BOOLEAN,
+    requiresModelUpdate = requiresModelUpdate,
   )
 
 /** Configuration setting for a segmented button. */
@@ -276,7 +281,7 @@ fun createLlmChatConfigs(
     configs.add(BooleanSwitchConfig(key = ConfigKeys.ENABLE_THINKING, defaultValue = false, needReinitialization = false)) // Read at request time, not during Engine init
   }
   if (supportSpeculativeDecoding) {
-    configs.add(BooleanSwitchConfig(key = ConfigKeys.ENABLE_SPECULATIVE_DECODING, defaultValue = false))
+    configs.add(BooleanSwitchConfig(key = ConfigKeys.ENABLE_SPECULATIVE_DECODING, defaultValue = false, requiresModelUpdate = true))
   }
   return configs
 }
