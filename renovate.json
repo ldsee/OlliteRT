@@ -1,0 +1,13 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "packageRules": [
+    {
+      "matchManagers": ["gradle"],
+      "matchPackageNames": ["com.google.ai.edge.litertlm:**"],
+      "groupName": "LiteRT-LM",
+      "automerge": false
+    }
+  ],
+  "schedule": ["* * */4 * *"]
+}

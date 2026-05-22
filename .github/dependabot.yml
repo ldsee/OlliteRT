@@ -4,10 +4,3 @@ updates:
     directory: /
     schedule:
       interval: weekly
-
-  - package-ecosystem: gradle
-    directory: /Android/src
-    schedule:
-      interval: weekly
-    allow:
-      - dependency-name: "com.google.ai.edge.litertlm:*"
