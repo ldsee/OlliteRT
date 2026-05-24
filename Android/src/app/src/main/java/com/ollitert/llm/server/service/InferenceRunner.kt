@@ -31,7 +31,6 @@ import com.ollitert.llm.server.data.ServerPrefs
 import com.ollitert.llm.server.data.Model
 import com.ollitert.llm.server.data.RESPONSES_TIMEOUT_SECONDS
 import com.ollitert.llm.server.data.WARMUP_MESSAGE
-import com.ollitert.llm.server.data.WARMUP_TIMEOUT_SECONDS
 import com.ollitert.llm.server.data.llmSupportAudio
 import com.ollitert.llm.server.data.llmSupportImage
 import com.ollitert.llm.server.data.llmSupportThinking
@@ -1127,7 +1126,7 @@ class InferenceRunner(
     val startMs = SystemClock.elapsedRealtime()
     val eagerVision = ServerPrefs.isEagerVisionInit(context)
     val (result, error) = kotlinx.coroutines.runBlocking {
-      runLlm(model, WARMUP_MESSAGE, "warmup", "warmup", timeoutSeconds = WARMUP_TIMEOUT_SECONDS, eagerVisionInit = eagerVision)
+      runLlm(model, WARMUP_MESSAGE, "warmup", "warmup", timeoutSeconds = ServerPrefs.getTimeoutWarmup(context), eagerVisionInit = eagerVision)
     }
     val elapsedMs = SystemClock.elapsedRealtime() - startMs
     if (error != null && error.startsWith("model_init_failed:")) {

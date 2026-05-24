@@ -25,7 +25,6 @@ import com.google.ai.edge.litertlm.Content
 import com.google.ai.edge.litertlm.Contents
 import com.ollitert.llm.server.R
 import com.ollitert.llm.server.data.IMPORTS_DIR
-import com.ollitert.llm.server.data.KEEP_ALIVE_RECHECK_MS
 import com.ollitert.llm.server.data.ServerPrefs
 import com.ollitert.llm.server.data.Model
 import com.ollitert.llm.server.data.llmSupportAudio
@@ -128,8 +127,9 @@ class ModelLifecycle(
       data class UnloadInfo(val model: Model, val minutes: Int)
       val info: UnloadInfo = synchronized(keepAliveLock) {
         if (ServerMetrics.isInferring.value) {
-          keepAliveHandler.postDelayed(keepAliveRunnable, KEEP_ALIVE_RECHECK_MS)
-          Log.i(TAG, "Keep-alive: model is inferring, will recheck in ${KEEP_ALIVE_RECHECK_MS / 1000}s")
+          val recheckMs = ServerPrefs.getTimeoutKeepAliveRecheckSeconds(context) * 1000
+          keepAliveHandler.postDelayed(keepAliveRunnable, recheckMs)
+          Log.i(TAG, "Keep-alive: model is inferring, will recheck in ${recheckMs / 1000}s")
           return@launch
         }
         val model = defaultModel ?: return@launch

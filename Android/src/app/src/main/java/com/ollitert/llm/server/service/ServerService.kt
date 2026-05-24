@@ -33,7 +33,6 @@ import com.ollitert.llm.server.OlliteRTApplication
 import com.ollitert.llm.server.R
 import com.ollitert.llm.server.common.ErrorCategory
 import com.ollitert.llm.server.common.getWifiIpAddress
-import com.ollitert.llm.server.data.CLEANUP_AWAIT_TIMEOUT_SECONDS
 import com.ollitert.llm.server.data.DATASTORE_READ_TIMEOUT_MS
 import com.ollitert.llm.server.data.ServerPrefs
 import com.ollitert.llm.server.data.MODEL_ALLOWLIST_FILENAME
@@ -563,11 +562,12 @@ class ServerService : Service() {
     cleanupLatch.get()?.let { latch ->
       if (latch.count > 0) {
         Log.i(TAG, "Waiting for previous model cleanup to finish...")
-        val cleanedUp = latch.await(CLEANUP_AWAIT_TIMEOUT_SECONDS, java.util.concurrent.TimeUnit.SECONDS)
+        val cleanupTimeout = ServerPrefs.getTimeoutCleanupAwait(this)
+        val cleanedUp = latch.await(cleanupTimeout, java.util.concurrent.TimeUnit.SECONDS)
         if (cleanedUp) {
           Log.i(TAG, "Previous cleanup finished, proceeding with model load")
         } else {
-          Log.w(TAG, "Previous cleanup did not finish within ${CLEANUP_AWAIT_TIMEOUT_SECONDS}s, proceeding anyway — native resource race possible")
+          Log.w(TAG, "Previous cleanup did not finish within ${cleanupTimeout}s, proceeding anyway — native resource race possible")
         }
       }
     }

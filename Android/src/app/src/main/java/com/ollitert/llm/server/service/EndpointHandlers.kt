@@ -18,7 +18,6 @@
 package com.ollitert.llm.server.service
 
 import android.content.Context
-import com.ollitert.llm.server.data.CHAT_COMPLETIONS_TIMEOUT_SECONDS
 import com.ollitert.llm.server.data.ConfigKeys
 import com.ollitert.llm.server.data.RequestPrefsSnapshot
 import com.ollitert.llm.server.data.MAX_MAX_TOKENS
@@ -30,7 +29,7 @@ import com.ollitert.llm.server.data.MIN_TEMPERATURE
 import com.ollitert.llm.server.data.MIN_TOPK
 import com.ollitert.llm.server.data.MIN_TOPP
 import com.ollitert.llm.server.data.Model
-import com.ollitert.llm.server.data.RESPONSES_TIMEOUT_SECONDS
+import com.ollitert.llm.server.data.ServerPrefs
 import com.ollitert.llm.server.data.llmSupportAudio
 import com.ollitert.llm.server.data.llmSupportImage
 import com.ollitert.llm.server.data.maxContextTokens
@@ -192,11 +191,11 @@ class EndpointHandlers(
 
     val stopSeqs = req.stop.ifEmpty { null }
     return if (req.stream == true) {
-      inferenceRunner.streamChatLlm(model, prompt, requestId, "/v1/chat/completions", timeoutSeconds = CHAT_COMPLETIONS_TIMEOUT_SECONDS, images = images, audioClips = audioClips, logId = logId, includeUsage = includeUsage, stopSequences = stopSeqs, tools = if (hasTools) tools else null, configSnapshot = sampler, json = json, prefs = prefs, schemaInjectionProviders = schemaInjectionProviders, schemaInjectionMessages = schemaInjectionMessages)
+      inferenceRunner.streamChatLlm(model, prompt, requestId, "/v1/chat/completions", timeoutSeconds = ServerPrefs.getTimeoutChatCompletions(context), images = images, audioClips = audioClips, logId = logId, includeUsage = includeUsage, stopSequences = stopSeqs, tools = if (hasTools) tools else null, configSnapshot = sampler, json = json, prefs = prefs, schemaInjectionProviders = schemaInjectionProviders, schemaInjectionMessages = schemaInjectionMessages)
     } else {
       ServerMetrics.onInferenceStarted()
       var schemaInjectionToolCalls: List<ToolCall> = emptyList()
-      val (rawText, llmError) = inferenceRunner.runLlm(model, prompt, requestId, "/v1/chat/completions", timeoutSeconds = CHAT_COMPLETIONS_TIMEOUT_SECONDS, images = images, audioClips = audioClips, logId = logId, configSnapshot = sampler, prefs = prefs, schemaInjectionProviders = schemaInjectionProviders, schemaInjectionMessages = schemaInjectionMessages, onNativeToolCalls = if (useSchemaInjection) { calls -> schemaInjectionToolCalls = calls } else null)
+      val (rawText, llmError) = inferenceRunner.runLlm(model, prompt, requestId, "/v1/chat/completions", timeoutSeconds = ServerPrefs.getTimeoutChatCompletions(context), images = images, audioClips = audioClips, logId = logId, configSnapshot = sampler, prefs = prefs, schemaInjectionProviders = schemaInjectionProviders, schemaInjectionMessages = schemaInjectionMessages, onNativeToolCalls = if (useSchemaInjection) { calls -> schemaInjectionToolCalls = calls } else null)
       ServerMetrics.onInferenceCompleted()
       if (rawText == null) return handleBlockingInferenceError(llmError, logId)
       val (text, _) = InferenceRunner.applyStopSequences(rawText, stopSeqs)
@@ -288,10 +287,10 @@ class EndpointHandlers(
     val stopSeqs = stopSequences?.ifEmpty { null }
 
     return if (req.stream == true) {
-      inferenceRunner.streamCompletions(model, prompt, requestId, "/v1/completions", timeoutSeconds = CHAT_COMPLETIONS_TIMEOUT_SECONDS, logId = logId, includeUsage = includeUsage, stopSequences = stopSeqs, configSnapshot = sampler, json = json, prefs = prefs)
+      inferenceRunner.streamCompletions(model, prompt, requestId, "/v1/completions", timeoutSeconds = ServerPrefs.getTimeoutChatCompletions(context), logId = logId, includeUsage = includeUsage, stopSequences = stopSeqs, configSnapshot = sampler, json = json, prefs = prefs)
     } else {
       ServerMetrics.onInferenceStarted()
-      val (rawText, llmError) = inferenceRunner.runLlm(model, prompt, requestId, "/v1/completions", timeoutSeconds = CHAT_COMPLETIONS_TIMEOUT_SECONDS, logId = logId, configSnapshot = sampler, prefs = prefs)
+      val (rawText, llmError) = inferenceRunner.runLlm(model, prompt, requestId, "/v1/completions", timeoutSeconds = ServerPrefs.getTimeoutChatCompletions(context), logId = logId, configSnapshot = sampler, prefs = prefs)
       ServerMetrics.onInferenceCompleted()
       if (rawText == null) return handleBlockingInferenceError(llmError, logId)
 
@@ -368,11 +367,11 @@ class EndpointHandlers(
     val sampler = resolveSamplerOverrides(model, prefs, req.temperature, req.top_p, req.top_k, req.max_output_tokens, logId)
 
     return if (req.stream == true) {
-      inferenceRunner.streamLlm(model, prompt, requestId, "/v1/responses", timeoutSeconds = RESPONSES_TIMEOUT_SECONDS, logId = logId, configSnapshot = sampler, json = json, tools = if (hasTools) tools else null, prefs = prefs, schemaInjectionProviders = schemaInjectionProvidersResp)
+      inferenceRunner.streamLlm(model, prompt, requestId, "/v1/responses", timeoutSeconds = ServerPrefs.getTimeoutResponses(context), logId = logId, configSnapshot = sampler, json = json, tools = if (hasTools) tools else null, prefs = prefs, schemaInjectionProviders = schemaInjectionProvidersResp)
     } else {
       ServerMetrics.onInferenceStarted()
       var schemaInjectionToolCallsResp: List<ToolCall> = emptyList()
-      val (text, llmError) = inferenceRunner.runLlm(model, prompt, requestId, "/v1/responses", timeoutSeconds = RESPONSES_TIMEOUT_SECONDS, logId = logId, configSnapshot = sampler, prefs = prefs, schemaInjectionProviders = schemaInjectionProvidersResp, onNativeToolCalls = if (useSchemaInjectionResp) { calls -> schemaInjectionToolCallsResp = calls } else null)
+      val (text, llmError) = inferenceRunner.runLlm(model, prompt, requestId, "/v1/responses", timeoutSeconds = ServerPrefs.getTimeoutResponses(context), logId = logId, configSnapshot = sampler, prefs = prefs, schemaInjectionProviders = schemaInjectionProvidersResp, onNativeToolCalls = if (useSchemaInjectionResp) { calls -> schemaInjectionToolCallsResp = calls } else null)
       ServerMetrics.onInferenceCompleted()
       if (text == null) return handleBlockingInferenceError(llmError, logId)
 
