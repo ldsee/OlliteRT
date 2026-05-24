@@ -97,11 +97,25 @@ class SettingsViewModelTest {
     every { ServerPrefs.getSttTranscriptionPromptText(any()) } returns ""
     every { ServerPrefs.isNotifShowRequestCount(any()) } returns false
     every { ServerPrefs.isResolveClientHostnames(any()) } returns false
+    every { ServerPrefs.getTimeoutChatCompletions(any()) } returns 120L
+    every { ServerPrefs.getTimeoutResponses(any()) } returns 90L
+    every { ServerPrefs.getTimeoutStreaming(any()) } returns 90L
+    every { ServerPrefs.getTimeoutBlocking(any()) } returns 30L
+    every { ServerPrefs.getTimeoutWarmup(any()) } returns 10L
+    every { ServerPrefs.getTimeoutKeepAliveRecheckSeconds(any()) } returns 30L
+    every { ServerPrefs.getTimeoutCleanupAwait(any()) } returns 15L
 
     every { ServerService.resetKeepAliveTimer(any()) } returns Unit
 
     every { ServerPrefs.setBearerToken(any(), any()) } returns Unit
     every { ServerPrefs.setKeepScreenOn(any(), any()) } returns Unit
+    every { ServerPrefs.setTimeoutChatCompletions(any(), any()) } returns Unit
+    every { ServerPrefs.setTimeoutResponses(any(), any()) } returns Unit
+    every { ServerPrefs.setTimeoutStreaming(any(), any()) } returns Unit
+    every { ServerPrefs.setTimeoutBlocking(any(), any()) } returns Unit
+    every { ServerPrefs.setTimeoutWarmup(any(), any()) } returns Unit
+    every { ServerPrefs.setTimeoutKeepAliveRecheckSeconds(any(), any()) } returns Unit
+    every { ServerPrefs.setTimeoutCleanupAwait(any(), any()) } returns Unit
     every { ServerPrefs.resetToDefaults(any()) } returns Unit
     every { ServerPrefs.dumpToLogcat(any()) } returns Unit
 
