@@ -61,6 +61,7 @@ enum class CardId {
   HOME_ASSISTANT,
   UPDATES,
   DEVELOPER,
+  ADVANCED_SETTINGS,
   RESET,
 }
 

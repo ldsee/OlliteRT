@@ -16,6 +16,9 @@
 
 package com.ollitert.llm.server.ui.server.settings
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -30,6 +33,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowRight
+import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -55,6 +61,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.ollitert.llm.server.R
 import com.ollitert.llm.server.ui.common.highlightSearchMatches
 import com.ollitert.llm.server.ui.common.olliteTextFieldColors
 import com.ollitert.llm.server.ui.server.SettingsViewModel
@@ -365,6 +372,57 @@ internal fun SettingsCardLayout(
     }
     Spacer(modifier = Modifier.height(12.dp))
     content()
+  }
+}
+
+@Composable
+internal fun CollapsibleSettingsCard(
+  icon: ImageVector,
+  title: String,
+  expanded: Boolean,
+  onExpandedChange: (Boolean) -> Unit,
+  modifier: Modifier = Modifier,
+  searchQuery: String = "",
+  content: @Composable () -> Unit,
+) {
+  Column(
+    modifier = modifier
+      .fillMaxWidth()
+      .clip(RoundedCornerShape(24.dp))
+      .background(MaterialTheme.colorScheme.surfaceContainerLow)
+      .padding(20.dp),
+  ) {
+    Row(
+      verticalAlignment = Alignment.CenterVertically,
+      modifier = Modifier
+        .fillMaxWidth()
+        .clip(RoundedCornerShape(8.dp))
+        .clickable { onExpandedChange(!expanded) },
+    ) {
+      Icon(
+        imageVector = icon,
+        contentDescription = null,
+        tint = OlliteRTPrimary,
+        modifier = Modifier.size(20.dp),
+      )
+      Spacer(modifier = Modifier.width(8.dp))
+      Text(
+        text = highlightSearchMatches(title, searchQuery, OlliteRTPrimary),
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.weight(1f),
+      )
+      Icon(
+        imageVector = if (expanded) Icons.Rounded.ArrowDropDown else Icons.AutoMirrored.Rounded.ArrowRight,
+        contentDescription = if (expanded) stringResource(R.string.cd_collapse) else stringResource(R.string.cd_expand),
+        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+    }
+    AnimatedVisibility(visible = expanded, enter = expandVertically(), exit = shrinkVertically()) {
+      Column(modifier = Modifier.padding(top = 12.dp)) {
+        content()
+      }
+    }
   }
 }
 

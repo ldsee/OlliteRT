@@ -28,6 +28,7 @@ import androidx.compose.material.icons.outlined.RestartAlt
 import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material.icons.outlined.Token
 import androidx.compose.material.icons.outlined.SystemUpdate
+import androidx.compose.material.icons.outlined.Science
 import androidx.compose.material.icons.outlined.Tune
 import com.ollitert.llm.server.R
 import com.ollitert.llm.server.data.DEFAULT_PORT
@@ -598,6 +599,204 @@ val EXPORT_LOGCAT = SettingDef.Custom(
   card = CardId.DEVELOPER,
 )
 
+// ─── Advanced Timeouts Card ──────────────────────────────────────────────
+
+val TIMEOUT_CHAT_COMPLETIONS = SettingDef.NumericWithUnit(
+  key = "timeout_chat_completions",
+  labelRes = R.string.settings_timeout_chat_completions_label,
+  descriptionRes = R.string.settings_timeout_chat_completions_desc,
+  card = CardId.ADVANCED_SETTINGS,
+  defaultValue = 120L,
+  defaultUnit = "seconds",
+  prefsKey = "timeout_chat_completions_seconds",
+  unitOptions = listOf("seconds", "minutes"),
+  toBaseUnit = { value, unit ->
+    when (unit) {
+      "minutes" -> value * 60
+      else -> value
+    }
+  },
+  fromBaseUnit = { base ->
+    when {
+      base > 0 && base % 60 == 0L -> Pair(base / 60, "minutes")
+      else -> Pair(base, "seconds")
+    }
+  },
+  min = 10,
+  max = 3600,
+  baseUnitLabel = "seconds",
+  read = { ServerPrefs.getTimeoutChatCompletions(it) },
+  write = { ctx, v -> ServerPrefs.setTimeoutChatCompletions(ctx, v) },
+)
+
+val TIMEOUT_RESPONSES = SettingDef.NumericWithUnit(
+  key = "timeout_responses",
+  labelRes = R.string.settings_timeout_responses_label,
+  descriptionRes = R.string.settings_timeout_responses_desc,
+  card = CardId.ADVANCED_SETTINGS,
+  defaultValue = 90L,
+  defaultUnit = "seconds",
+  prefsKey = "timeout_responses_seconds",
+  unitOptions = listOf("seconds", "minutes"),
+  toBaseUnit = { value, unit ->
+    when (unit) {
+      "minutes" -> value * 60
+      else -> value
+    }
+  },
+  fromBaseUnit = { base ->
+    when {
+      base > 0 && base % 60 == 0L -> Pair(base / 60, "minutes")
+      else -> Pair(base, "seconds")
+    }
+  },
+  min = 10,
+  max = 3600,
+  baseUnitLabel = "seconds",
+  read = { ServerPrefs.getTimeoutResponses(it) },
+  write = { ctx, v -> ServerPrefs.setTimeoutResponses(ctx, v) },
+)
+
+val TIMEOUT_STREAMING = SettingDef.NumericWithUnit(
+  key = "timeout_streaming",
+  labelRes = R.string.settings_timeout_streaming_label,
+  descriptionRes = R.string.settings_timeout_streaming_desc,
+  card = CardId.ADVANCED_SETTINGS,
+  defaultValue = 90L,
+  defaultUnit = "seconds",
+  prefsKey = "timeout_streaming_seconds",
+  unitOptions = listOf("seconds", "minutes"),
+  toBaseUnit = { value, unit ->
+    when (unit) {
+      "minutes" -> value * 60
+      else -> value
+    }
+  },
+  fromBaseUnit = { base ->
+    when {
+      base > 0 && base % 60 == 0L -> Pair(base / 60, "minutes")
+      else -> Pair(base, "seconds")
+    }
+  },
+  min = 10,
+  max = 3600,
+  baseUnitLabel = "seconds",
+  read = { ServerPrefs.getTimeoutStreaming(it) },
+  write = { ctx, v -> ServerPrefs.setTimeoutStreaming(ctx, v) },
+)
+
+val TIMEOUT_BLOCKING = SettingDef.NumericWithUnit(
+  key = "timeout_blocking",
+  labelRes = R.string.settings_timeout_blocking_label,
+  descriptionRes = R.string.settings_timeout_blocking_desc,
+  card = CardId.ADVANCED_SETTINGS,
+  defaultValue = 30L,
+  defaultUnit = "seconds",
+  prefsKey = "timeout_blocking_seconds",
+  unitOptions = listOf("seconds", "minutes"),
+  toBaseUnit = { value, unit ->
+    when (unit) {
+      "minutes" -> value * 60
+      else -> value
+    }
+  },
+  fromBaseUnit = { base ->
+    when {
+      base > 0 && base % 60 == 0L -> Pair(base / 60, "minutes")
+      else -> Pair(base, "seconds")
+    }
+  },
+  min = 10,
+  max = 3600,
+  baseUnitLabel = "seconds",
+  read = { ServerPrefs.getTimeoutBlocking(it) },
+  write = { ctx, v -> ServerPrefs.setTimeoutBlocking(ctx, v) },
+)
+
+val TIMEOUT_WARMUP = SettingDef.NumericWithUnit(
+  key = "timeout_warmup",
+  labelRes = R.string.settings_timeout_warmup_label,
+  descriptionRes = R.string.settings_timeout_warmup_desc,
+  card = CardId.ADVANCED_SETTINGS,
+  defaultValue = 10L,
+  defaultUnit = "seconds",
+  prefsKey = "timeout_warmup_seconds",
+  unitOptions = listOf("seconds", "minutes"),
+  toBaseUnit = { value, unit ->
+    when (unit) {
+      "minutes" -> value * 60
+      else -> value
+    }
+  },
+  fromBaseUnit = { base ->
+    when {
+      base > 0 && base % 60 == 0L -> Pair(base / 60, "minutes")
+      else -> Pair(base, "seconds")
+    }
+  },
+  min = 5,
+  max = 300,
+  baseUnitLabel = "seconds",
+  read = { ServerPrefs.getTimeoutWarmup(it) },
+  write = { ctx, v -> ServerPrefs.setTimeoutWarmup(ctx, v) },
+)
+
+val TIMEOUT_KEEP_ALIVE_RECHECK = SettingDef.NumericWithUnit(
+  key = "timeout_keep_alive_recheck",
+  labelRes = R.string.settings_timeout_keep_alive_recheck_label,
+  descriptionRes = R.string.settings_timeout_keep_alive_recheck_desc,
+  card = CardId.ADVANCED_SETTINGS,
+  defaultValue = 30L,
+  defaultUnit = "seconds",
+  prefsKey = "timeout_keep_alive_recheck_seconds",
+  unitOptions = listOf("seconds", "minutes"),
+  toBaseUnit = { value, unit ->
+    when (unit) {
+      "minutes" -> value * 60
+      else -> value
+    }
+  },
+  fromBaseUnit = { base ->
+    when {
+      base > 0 && base % 60 == 0L -> Pair(base / 60, "minutes")
+      else -> Pair(base, "seconds")
+    }
+  },
+  min = 10,
+  max = 300,
+  baseUnitLabel = "seconds",
+  read = { ServerPrefs.getTimeoutKeepAliveRecheckSeconds(it) },
+  write = { ctx, v -> ServerPrefs.setTimeoutKeepAliveRecheckSeconds(ctx, v) },
+)
+
+val TIMEOUT_CLEANUP_AWAIT = SettingDef.NumericWithUnit(
+  key = "timeout_cleanup_await",
+  labelRes = R.string.settings_timeout_cleanup_await_label,
+  descriptionRes = R.string.settings_timeout_cleanup_await_desc,
+  card = CardId.ADVANCED_SETTINGS,
+  defaultValue = 15L,
+  defaultUnit = "seconds",
+  prefsKey = "timeout_cleanup_await_seconds",
+  unitOptions = listOf("seconds", "minutes"),
+  toBaseUnit = { value, unit ->
+    when (unit) {
+      "minutes" -> value * 60
+      else -> value
+    }
+  },
+  fromBaseUnit = { base ->
+    when {
+      base > 0 && base % 60 == 0L -> Pair(base / 60, "minutes")
+      else -> Pair(base, "seconds")
+    }
+  },
+  min = 5,
+  max = 120,
+  baseUnitLabel = "seconds",
+  read = { ServerPrefs.getTimeoutCleanupAwait(it) },
+  write = { ctx, v -> ServerPrefs.setTimeoutCleanupAwait(ctx, v) },
+)
+
 // ─── Reset Section ────────────────────────────────────────────────────
 
 val RESET_TO_DEFAULTS = SettingDef.Custom(
@@ -645,6 +844,9 @@ val allSettingDefs: List<SettingDef> = listOf(
   AUTO_UPDATE_CHECK, CHECK_FREQUENCY, CROSS_CHANNEL_NOTIFY, CHECK_FOR_UPDATES, NOTIFICATION_SETTINGS,
   // Developer
   VERBOSE_DEBUG, EXPORT_LOGCAT,
+  // Advanced Timeouts
+  TIMEOUT_CHAT_COMPLETIONS, TIMEOUT_RESPONSES, TIMEOUT_STREAMING, TIMEOUT_BLOCKING,
+  TIMEOUT_WARMUP, TIMEOUT_KEEP_ALIVE_RECHECK, TIMEOUT_CLEANUP_AWAIT,
   // Reset
   RESET_TO_DEFAULTS,
 )
@@ -736,6 +938,15 @@ val allCardDefs: List<CardDef> = listOf(
     titleRes = R.string.settings_card_developer,
     icon = CardIcon.Vector(Icons.Outlined.BugReport),
     settings = listOf(VERBOSE_DEBUG, EXPORT_LOGCAT),
+  ),
+  CardDef(
+    id = CardId.ADVANCED_SETTINGS,
+    titleRes = R.string.settings_card_advanced_settings,
+    icon = CardIcon.Vector(Icons.Outlined.Science),
+    settings = listOf(
+      TIMEOUT_CHAT_COMPLETIONS, TIMEOUT_RESPONSES, TIMEOUT_STREAMING, TIMEOUT_BLOCKING,
+      TIMEOUT_WARMUP, TIMEOUT_KEEP_ALIVE_RECHECK, TIMEOUT_CLEANUP_AWAIT,
+    ),
   ),
   CardDef(
     id = CardId.RESET,

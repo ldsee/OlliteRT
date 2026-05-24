@@ -145,6 +145,15 @@ class SettingsViewModel @Inject constructor(
   val showRequestTypesEntry get() = entry<Boolean>("show_request_types")
   val showAdvancedMetricsEntry get() = entry<Boolean>("show_advanced_metrics")
 
+  // Advanced Timeouts
+  val timeoutChatCompletionsEntry get() = entry<Long>("timeout_chat_completions")
+  val timeoutResponsesEntry get() = entry<Long>("timeout_responses")
+  val timeoutStreamingEntry get() = entry<Long>("timeout_streaming")
+  val timeoutBlockingEntry get() = entry<Long>("timeout_blocking")
+  val timeoutWarmupEntry get() = entry<Long>("timeout_warmup")
+  val timeoutKeepAliveRecheckEntry get() = entry<Long>("timeout_keep_alive_recheck")
+  val timeoutCleanupAwaitEntry get() = entry<Long>("timeout_cleanup_await")
+
   // ─── UI State (non-persisted) ────────────────────────────────────────────
 
   var portText by mutableStateOf(portEntry.saved.toString())
@@ -155,6 +164,11 @@ class SettingsViewModel @Inject constructor(
   val validationErrors = mutableStateMapOf<String, String>()
   fun hasError(key: String): Boolean = key in validationErrors
   fun clearError(key: String) { validationErrors.remove(key) }
+
+  // ─── Advanced Settings Collapse ──────────────────────────────────────────
+  var advancedSettingsExpanded by mutableStateOf(false)
+  val shouldAutoExpandAdvanced: Boolean get() =
+    searchQuery.isNotBlank() && cardVisible(CardId.ADVANCED_SETTINGS)
 
   // ─── Dialog State ────────────────────────────────────────────────────────
   var showRestartDialog by mutableStateOf(false)
@@ -281,7 +295,11 @@ class SettingsViewModel @Inject constructor(
     val port = portText.toIntOrNull() ?: return SaveResult.ValidationError(context.getString(R.string.validation_invalid_port))
     val isPortChanged = port != portEntry.saved
     val isEagerVisionChanged = eagerVisionInitEntry.isChanged
-    val needsRestart = isPortChanged || isEagerVisionChanged
+    val isTimeoutChanged = timeoutChatCompletionsEntry.isChanged ||
+      timeoutResponsesEntry.isChanged || timeoutStreamingEntry.isChanged ||
+      timeoutBlockingEntry.isChanged || timeoutWarmupEntry.isChanged ||
+      timeoutKeepAliveRecheckEntry.isChanged || timeoutCleanupAwaitEntry.isChanged
+    val needsRestart = isPortChanged || isEagerVisionChanged || isTimeoutChanged
     val isServerActive = serverStatus == ServerStatus.RUNNING || serverStatus == ServerStatus.LOADING
 
     // Sync portEntry.current from portText before persisting (port is edited as String)
