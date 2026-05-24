@@ -69,6 +69,7 @@ Point-in-time values that can go up or down.
 | `ollitert_request_latency_peak_ms` | Peak request latency |
 | `ollitert_context_utilization_percent` | Last request context window usage (%) |
 | `ollitert_requests_processing` | Currently inferring (0 or 1) |
+| `ollitert_model_speculative_decoding_enabled` | Speculative decoding (MTP) enabled (0 or 1) |
 | `ollitert_model_idle_unloaded` | Model unloaded due to keep-alive idle timeout (0 or 1) |
 | `ollitert_memory_native_heap_bytes` | Native heap allocated bytes (LiteRT model weights) |
 | `ollitert_memory_app_heap_used_bytes` | JVM heap used bytes |

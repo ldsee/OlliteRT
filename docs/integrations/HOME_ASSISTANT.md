@@ -34,6 +34,7 @@ OlliteRT's `GET /health?metrics=true` endpoint returns a JSON payload with serve
 | Update Available | `update_available` | `true` if a newer OlliteRT version exists (app update, not model update) |
 | Version | `version` | OlliteRT version string (e.g. `"1.2.0"`) |
 | Thinking | `thinking_enabled` | Whether chain-of-thought mode is active |
+| Speculative Decoding | `speculative_decoding_enabled` | Whether MTP is active |
 | Accelerator | `accelerator` | `gpu`, `cpu`, or `gpu,cpu` |
 | Idle Unloaded | `is_idle_unloaded` | `true` if model was unloaded by keep-alive |
 | Requests | `metrics.requests_total` | Total requests processed |
@@ -75,6 +76,8 @@ rest:
         unit_of_measurement: "s"
       - name: "OlliteRT Thinking"
         value_template: "{{ value_json.thinking_enabled | default(false) }}"
+      - name: "OlliteRT Speculative Decoding"
+        value_template: "{{ value_json.speculative_decoding_enabled | default(false) }}"
       - name: "OlliteRT Accelerator"
         value_template: "{{ value_json.accelerator | default('unknown') }}"
       - name: "OlliteRT Idle"

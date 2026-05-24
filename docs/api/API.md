@@ -317,7 +317,8 @@ Returns a list of available models with their capabilities and update status.
     "capabilities": {
       "image": true,
       "audio": true,
-      "thinking": true
+      "thinking": true,
+      "speculative_decoding": true
     },
     "update_available": false
   }]
@@ -330,7 +331,7 @@ Returns a list of available models with their capabilities and update status.
 | `object` | string | Always `"model"` |
 | `created` | integer | Unix timestamp |
 | `owned_by` | string | Always `"ollitert"` |
-| `capabilities` | object | `image`, `audio`, `thinking` booleans. `thinking` indicates the model supports chain-of-thought AND it is currently enabled in settings (not just model capability). |
+| `capabilities` | object | `image`, `audio`, `thinking`, `speculative_decoding` booleans. `thinking` indicates the model supports chain-of-thought AND it is currently enabled in settings (not just model capability). `speculative_decoding` indicates MTP is supported AND enabled. |
 | `update_available` | boolean | `true` if a newer version of this model is available in the allowlist |
 
 ## Model Detail — `GET /v1/models/{id}`
@@ -369,6 +370,7 @@ Appends server info and a `metrics` object to the base response:
 |:------|:-----|:------------|
 | `version` | string | OlliteRT version string |
 | `thinking_enabled` | boolean | Whether chain-of-thought mode is active |
+| `speculative_decoding_enabled` | boolean | Whether speculative decoding (MTP) is active |
 | `accelerator` | string | `gpu`, `cpu`, or `gpu,cpu` |
 | `is_idle_unloaded` | boolean | `true` if model was unloaded by keep-alive timeout |
 | `metrics.requests_total` | integer | Total requests processed |
