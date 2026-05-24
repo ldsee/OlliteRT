@@ -166,7 +166,7 @@ What happens on your phone stays on your phone. If that matters to you, consider
 ## Credits
 
 - **[Google AI Edge Gallery](https://github.com/google-ai-edge/gallery)** — Original project this was built upon
-- **[LiteRT](https://github.com/google/litert)** — Google's on-device AI runtime
+- **[LiteRT-LM](https://github.com/google-ai-edge/LiteRT-LM)** — Google's on-device AI runtime
 - **[Ktor](https://ktor.io/)** — Coroutine-based HTTP server framework
 
 ## License
