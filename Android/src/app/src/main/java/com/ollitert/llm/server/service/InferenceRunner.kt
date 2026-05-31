@@ -315,6 +315,12 @@ class InferenceRunner(
       totalLatencyMs: Long,
       maxTokens: Int?,
       nativeToolCalls: List<ToolCall> = emptyList(),
+      // Whether the streaming truncator matched a configured stop string.
+      // OAI-shape formats ignore this and continue to derive finish_reason from token counts.
+      // Only the Anthropic format consumes it (to emit stop_reason="stop_sequence").
+      stopSequenceTriggered: Boolean = false,
+      // The matched stop string when stopSequenceTriggered is true. Null otherwise.
+      matchedStopSequence: String? = null,
     ): List<ToolCall>
     fun buildLogResponseJson(
       combinedText: String,
@@ -376,6 +382,8 @@ class InferenceRunner(
       totalLatencyMs: Long,
       maxTokens: Int?,
       nativeToolCalls: List<ToolCall>,
+      stopSequenceTriggered: Boolean,
+      matchedStopSequence: String?,
     ): List<ToolCall> {
       val parsedToolCalls = nativeToolCalls.ifEmpty {
         if (tools != null) ToolCallParser.parseAll(fullText, tools) else emptyList()
@@ -474,6 +482,8 @@ class InferenceRunner(
       totalLatencyMs: Long,
       maxTokens: Int?,
       nativeToolCalls: List<ToolCall>,
+      stopSequenceTriggered: Boolean,
+      matchedStopSequence: String?,
     ): List<ToolCall> {
       val parsedToolCalls = nativeToolCalls.ifEmpty {
         if (tools != null) ToolCallParser.parseAll(fullText, tools) else emptyList()
@@ -565,6 +575,8 @@ class InferenceRunner(
       totalLatencyMs: Long,
       maxTokens: Int?,
       nativeToolCalls: List<ToolCall>,
+      stopSequenceTriggered: Boolean,
+      matchedStopSequence: String?,
     ): List<ToolCall> {
       val finishReason = FinishReason.infer(completionTokens, maxTokens)
       writer.emit(ResponseRenderer.buildCompletionStreamFinalChunk(cmplId, modelName, now, finishReason))
@@ -618,6 +630,10 @@ class InferenceRunner(
     var inferenceStarted = false
     var inferenceCompleted = false
     var stopSequenceTriggered = false
+    // The actual stop string that matched, set in lock-step with stopSequenceTriggered.
+    // Anthropic /v1/messages echoes this back in the response `stop_sequence` field;
+    // OAI-shape formats ignore it.
+    var matchedStopSequence: String? = null
 
     fun markStarted() {
       if (!inferenceStarted) {
@@ -662,14 +678,19 @@ class InferenceRunner(
       if (stopSequences.isNullOrEmpty() || stopSequenceTriggered) return
       val currentText = fullText.toString()
       var earliest = currentText.length
+      var matched: String? = null
       for (stop in stopSequences) {
         val idx = currentText.indexOf(stop)
-        if (idx in 0 until earliest) earliest = idx
+        if (idx in 0 until earliest) {
+          earliest = idx
+          matched = stop
+        }
       }
       if (earliest < currentText.length) {
         fullText.clear()
         fullText.append(currentText.substring(0, earliest))
         stopSequenceTriggered = true
+        matchedStopSequence = matched
         ServerLlmModelHelper.stopResponse(model)
       }
     }
@@ -787,7 +808,7 @@ class InferenceRunner(
       val convertedNativeCalls = if (nativeCalls != null && nativeCalls.isNotEmpty()) {
         SchemaInjectionBridge.convertNativeToolCalls(nativeCalls)
       } else emptyList()
-      val parsedToolCalls = format.emitCompletion(writer, fullText.toString(), fullThinking.toString(), promptTokens, completionTokens, ttfbMs, totalLatencyMs, effectiveMaxTokens, convertedNativeCalls)
+      val parsedToolCalls = format.emitCompletion(writer, fullText.toString(), fullThinking.toString(), promptTokens, completionTokens, ttfbMs, totalLatencyMs, effectiveMaxTokens, convertedNativeCalls, stopSequenceTriggered, matchedStopSequence)
 
       if (logId != null) {
         val combinedText = buildCombinedText(fullText, fullThinking)
@@ -1200,17 +1221,23 @@ class InferenceRunner(
 
     /**
      * Truncates model output at the first occurrence of any stop sequence.
-     * Returns the truncated text and whether truncation occurred.
+     * Returns (truncated text, was truncation applied, the stop string that matched
+     * — null when nothing matched). The matched string is needed by the Anthropic
+     * /v1/messages response, which echoes it back in the `stop_sequence` field.
      */
-    fun applyStopSequences(text: String, stopSequences: List<String>?): Pair<String, Boolean> {
-      if (stopSequences.isNullOrEmpty()) return text to false
+    fun applyStopSequences(text: String, stopSequences: List<String>?): Triple<String, Boolean, String?> {
+      if (stopSequences.isNullOrEmpty()) return Triple(text, false, null)
       var earliest = text.length
+      var matched: String? = null
       for (stop in stopSequences) {
         val idx = text.indexOf(stop)
-        if (idx in 0 until earliest) earliest = idx
+        if (idx in 0 until earliest) {
+          earliest = idx
+          matched = stop
+        }
       }
-      return if (earliest < text.length) text.substring(0, earliest) to true
-      else text to false
+      return if (earliest < text.length) Triple(text.substring(0, earliest), true, matched)
+      else Triple(text, false, null)
     }
 
     /**
