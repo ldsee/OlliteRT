@@ -32,6 +32,7 @@ import com.ollitert.llm.server.data.STREAM_OUTER_TIMEOUT_SAFETY_BUFFER_SECONDS
 import com.ollitert.llm.server.data.ServerPrefs
 import com.ollitert.llm.server.data.Model
 import com.ollitert.llm.server.data.RESPONSES_TIMEOUT_SECONDS
+import com.ollitert.llm.server.data.SSE_PING_INTERVAL_MS
 import com.ollitert.llm.server.data.WARMUP_MESSAGE
 import com.ollitert.llm.server.data.llmSupportAudio
 import com.ollitert.llm.server.data.llmSupportImage
@@ -40,7 +41,11 @@ import com.ollitert.llm.server.data.isThinkingEnabled
 import com.ollitert.llm.server.data.maxTokensInt
 import com.ollitert.llm.server.data.maxTokensLong
 import com.ollitert.llm.server.runtime.ServerLlmModelHelper
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.atomic.AtomicBoolean
@@ -319,6 +324,15 @@ class InferenceRunner(
     suspend fun emitContentDelta(writer: SseWriter, text: String)
     suspend fun emitThinkingClose(writer: SseWriter)
     suspend fun emitCancellation(writer: SseWriter, headerWritten: Boolean)
+    // True when the format wants its `message_start`-equivalent header sent
+    // immediately at request acceptance (before prefill begins) instead of being
+    // gated on the first token. Anthropic's Messages spec defines an explicit
+    // `message_start` event and ping events for the prefill window; OAI-shape
+    // formats have no such concept, so they keep the existing first-token gate.
+    val emitsHeaderEarly: Boolean get() = false
+    // Format-specific keep-alive emission while inference is still in prefill.
+    // Default is a no-op so non-Anthropic formats stay silent until first token.
+    suspend fun emitPing(writer: SseWriter) {}
     fun estimateInputTokens(prompt: String): Long
     fun estimateInputTokensInt(prompt: String): Int
     suspend fun emitCompletion(
@@ -705,11 +719,18 @@ class InferenceRunner(
       }
     }
 
+    override val emitsHeaderEarly: Boolean = true
+
     override suspend fun emitHeader(writer: SseWriter) {
       val escapedModel = BridgeUtils.escapeSseText(requestModelId)
       val payload =
         """{"type":"message_start","message":{"id":"$msgId","type":"message","role":"assistant","model":"$escapedModel","content":[],"stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":0,"output_tokens":0}}}"""
       emitSse(writer, "message_start", payload)
+    }
+
+    override suspend fun emitPing(writer: SseWriter) {
+      // Spec: https://docs.anthropic.com/en/api/messages-streaming#ping-events
+      emitSse(writer, "ping", """{"type":"ping"}""")
     }
 
     private suspend fun openBlockIfNeeded(writer: SseWriter, kind: String) {
@@ -1432,6 +1453,45 @@ class InferenceRunner(
       var originalConfig: Map<String, Any>? = null
       val capturedNativeToolCalls = AtomicReference<List<com.google.ai.edge.litertlm.ToolCall>?>(null)
 
+      // Pre-emit the format's header (e.g. Anthropic `message_start`) as the very
+      // first SSE bytes so the client sees a response before prefill begins. Without
+      // this, on-device prefill (often >30s for multi-KB prompts on Gemma-4-E2B)
+      // exceeds the SDK's idle timeout and the client cancels with zero output.
+      // OAI-shape formats opt out via emitsHeaderEarly=false.
+      if (!format.bufferAllTokens && format.emitsHeaderEarly && !writer.isCancelled) {
+        try {
+          format.emitHeader(writer)
+          state.headerWritten = true
+        } catch (e: Exception) {
+          Log.w(TAG, "Pre-emit header failed for $requestId", e)
+        }
+      }
+
+      // Heartbeat coroutine: while inference is still in prefill (no token observed)
+      // and the writer is alive, emit a format-specific ping every SSE_PING_INTERVAL_MS
+      // so the client's idle-stream timeout doesn't fire. Anthropic's spec defines the
+      // `ping` event explicitly; non-Anthropic formats default to a no-op so this loop
+      // is harmless on every code path. Cancelled as soon as the first token arrives,
+      // the channel closes, or the SSE writer reports cancellation.
+      val heartbeatJob = if (format.emitsHeaderEarly) {
+        CoroutineScope(kotlin.coroutines.coroutineContext).launch {
+          try {
+            while (isActive) {
+              delay(SSE_PING_INTERVAL_MS)
+              if (writer.isCancelled || state.firstTokenMs != 0L || state.inferenceCompleted) break
+              try {
+                format.emitPing(writer)
+              } catch (e: Exception) {
+                Log.w(TAG, "Heartbeat ping failed for $requestId", e)
+                break
+              }
+            }
+          } catch (_: kotlinx.coroutines.CancellationException) {
+            // Normal scope cancel — nothing to do.
+          }
+        }
+      } else null
+
       // Launch inference on the executor thread. Callbacks send events into the channel
       // via trySend() — non-blocking from the executor thread's perspective.
       InferenceGateway.executeStreaming(
@@ -1564,6 +1624,7 @@ class InferenceRunner(
         // even when onInferenceFinished was never reached.
         state.markCompleted()
         state.markMetricsCompleted()
+        heartbeatJob?.cancel()
       }
     }
   }
