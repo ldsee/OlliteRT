@@ -291,4 +291,93 @@ class AnthropicConverterTest {
     )
     AnthropicConverter.toInternalChatRequest(req)  // Must not throw
   }
+
+  // ── Response side ─────────────────────────────────────────────────────────
+
+  private fun reshape(body: String, model: String = "test-model", reqId: String = "abc", matched: String? = null) =
+    json.parseToJsonElement(
+      AnthropicConverter.toAnthropicResponse(json, body, model, reqId, matched)
+    ).jsonObject
+
+  @Test
+  fun responseTextOnlyProducesSingleTextBlock() {
+    val oai = """{"id":"chatcmpl-1","model":"resolved","choices":[{"index":0,"message":{"role":"assistant","content":"hello"},"finish_reason":"stop"}],"usage":{"prompt_tokens":3,"completion_tokens":5,"total_tokens":8}}"""
+    val obj = reshape(oai)
+    assertEquals("msg_abc", obj["id"]!!.jsonPrimitive.content)
+    assertEquals("message", obj["type"]!!.jsonPrimitive.content)
+    assertEquals("end_turn", obj["stop_reason"]!!.jsonPrimitive.content)
+    val content = obj["content"] as kotlinx.serialization.json.JsonArray
+    assertEquals(1, content.size)
+    assertEquals("text", content[0].jsonObject["type"]!!.jsonPrimitive.content)
+    assertEquals("hello", content[0].jsonObject["text"]!!.jsonPrimitive.content)
+    val usage = obj["usage"]!!.jsonObject
+    assertEquals(3, usage["input_tokens"]!!.jsonPrimitive.content.toInt())
+    assertEquals(5, usage["output_tokens"]!!.jsonPrimitive.content.toInt())
+  }
+
+  @Test
+  fun responseThinkingPrefixSplitsIntoSeparateBlock() {
+    val oai = """{"id":"x","model":"m","choices":[{"index":0,"message":{"role":"assistant","content":"<think>reason</think>answer"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}"""
+    val obj = reshape(oai)
+    val content = obj["content"] as kotlinx.serialization.json.JsonArray
+    assertEquals(2, content.size)
+    assertEquals("thinking", content[0].jsonObject["type"]!!.jsonPrimitive.content)
+    assertEquals("reason", content[0].jsonObject["thinking"]!!.jsonPrimitive.content)
+    assertEquals("text", content[1].jsonObject["type"]!!.jsonPrimitive.content)
+    assertEquals("answer", content[1].jsonObject["text"]!!.jsonPrimitive.content)
+  }
+
+  @Test
+  fun responseLengthFinishMapsToMaxTokens() {
+    val oai = """{"id":"x","model":"m","choices":[{"index":0,"message":{"role":"assistant","content":"long"},"finish_reason":"length"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}"""
+    assertEquals("max_tokens", reshape(oai)["stop_reason"]!!.jsonPrimitive.content)
+  }
+
+  @Test
+  fun responseStopSequenceWinsOverNaturalStop() {
+    val oai = """{"id":"x","model":"m","choices":[{"index":0,"message":{"role":"assistant","content":"hi"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}"""
+    val obj = reshape(oai, matched = "<END>")
+    assertEquals("stop_sequence", obj["stop_reason"]!!.jsonPrimitive.content)
+    assertEquals("<END>", obj["stop_sequence"]!!.jsonPrimitive.content)
+  }
+
+  @Test
+  fun responseToolCallsBecomeToolUseBlocks() {
+    val oai = """{"id":"x","model":"m","choices":[{"index":0,"message":{"role":"assistant","content":"","tool_calls":[{"id":"call_1","type":"function","function":{"name":"get_weather","arguments":"{\"city\":\"Paris\"}"}}]},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}"""
+    val obj = reshape(oai)
+    assertEquals("tool_use", obj["stop_reason"]!!.jsonPrimitive.content)
+    val content = obj["content"] as kotlinx.serialization.json.JsonArray
+    val toolBlock = content.single { it.jsonObject["type"]!!.jsonPrimitive.content == "tool_use" }.jsonObject
+    assertEquals("call_1", toolBlock["id"]!!.jsonPrimitive.content)
+    assertEquals("get_weather", toolBlock["name"]!!.jsonPrimitive.content)
+    assertEquals("Paris", toolBlock["input"]!!.jsonObject["city"]!!.jsonPrimitive.content)
+  }
+
+  @Test
+  fun splitThinkingHandlesNoTags() {
+    val (thinking, rest) = AnthropicConverter.splitThinkingAndText("plain")
+    assertEquals("", thinking)
+    assertEquals("plain", rest)
+  }
+
+  @Test
+  fun splitThinkingHandlesUnclosedTag() {
+    val (thinking, rest) = AnthropicConverter.splitThinkingAndText("<think>oops")
+    assertEquals("", thinking)
+    assertEquals("<think>oops", rest)
+  }
+
+  @Test
+  fun responseHandlesExplicitNullToolCalls() {
+    // PayloadBuilders serializes ChatResponse with encodeDefaults=true so tool_calls
+    // appears as JSON null on the wire. Calling .jsonArray on a JsonNull would throw
+    // "Element class kotlinx.serialization.json.JsonNull is not a JsonArray" — this
+    // test pins the null-tolerant cast in toAnthropicResponse.
+    val oai = """{"id":"chatcmpl-1","model":"resolved","choices":[{"index":0,"message":{"role":"assistant","content":"hi","tool_calls":null,"tool_call_id":null,"name":null},"logprobs":null,"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2},"system_fingerprint":null,"timings":null}"""
+    val obj = reshape(oai)
+    val content = obj["content"] as kotlinx.serialization.json.JsonArray
+    assertEquals(1, content.size)
+    assertEquals("hi", content[0].jsonObject["text"]!!.jsonPrimitive.content)
+    assertEquals("end_turn", obj["stop_reason"]!!.jsonPrimitive.content)
+  }
 }

@@ -42,6 +42,24 @@ private const val TAG = "OlliteRT.SchemaInjectionBridge"
  *
  * This entire file is removable once the SDK's native tool calling is fully
  * stable and the toggle is removed.
+ *
+ * **Known issue — Gemma-4 native tool calling is unreliable on LiteRT-LM 0.11.0
+ * / 0.12.0.** When a tool argument is a string that itself contains quoted
+ * content (a Bash command, an Edit `old_string`/`new_string`, a WebFetch URL,
+ * any JSON-in-a-string param), Gemma-4 emits its trained `<|"|>` quote
+ * delimiter for the inner quotes. The SDK's ANTLR-based function-call parser
+ * does not understand `<|"|>` and throws `INVALID_ARGUMENT: Failed to parse
+ * FC tool calls`, surfacing as a 500 to the API client. This affects every
+ * Anthropic /v1/messages request from Claude Code (Bash/Edit/Read/etc are
+ * always sent), every OAI /v1/chat/completions request with similar tools,
+ * and every /v1/responses request with tools. Tracking upstream:
+ *   https://github.com/google-ai-edge/LiteRT-LM/issues/2418
+ *
+ * Until the SDK ships a parser fix, callers should be prepared for the
+ * surfaced error. Disabling this toggle (set `schema_injection_tool_calling`
+ * to false in Settings) routes through PromptBuilder + [ToolCallParser] text
+ * mode, which avoids the SDK parser entirely at the cost of less precise
+ * tool-call detection.
  */
 object SchemaInjectionBridge {
 
@@ -51,6 +69,11 @@ object SchemaInjectionBridge {
 
   private val json = Json { ignoreUnknownKeys = true }
 
+  // See the file-level KDoc for the LiteRT-LM #2418 known issue. Until the
+  // SDK fixes its FC parser to handle Gemma-4's `<|"|>` quote tokens, every
+  // ToolProvider registered here can trigger an INVALID_ARGUMENT error on
+  // string args that contain quoted content. Issue:
+  //   https://github.com/google-ai-edge/LiteRT-LM/issues/2418
   fun toolSpecsToProviders(specs: List<ToolSpec>): List<ToolProvider> =
     specs.map { spec ->
       val descriptionJson = buildJsonObject {

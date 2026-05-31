@@ -94,6 +94,7 @@ private const val TAG = "OlliteRT.Server"
 
 private val INFERENCE_PATHS = setOf(
   "/generate", "/v1/completions", "/v1/chat/completions", "/v1/responses", "/v1/audio/transcriptions",
+  "/v1/messages", "/v1/messages/count_tokens",
 )
 
 class KtorServer(
@@ -105,6 +106,7 @@ class KtorServer(
   private val nextRequestId: () -> String,
   private val emitDebugStackTrace: (Throwable, String, String?) -> Unit,
   private val audioTranscriptionHandler: AudioTranscriptionHandler,
+  private val anthropicEndpointHandlers: AnthropicEndpointHandlers,
   private val inferenceLock: Any,
 ) {
 
@@ -378,6 +380,13 @@ class KtorServer(
       if (!requireAuth(call)) return@post
       withRequestLogging(call) { body, captureBody, captureResponse, logId, _, prefs ->
         endpointHandlers.handleResponses(body, captureBody, captureResponse, logId, prefs)
+      }
+    }
+
+    post("/v1/messages") {
+      if (!requireAuth(call)) return@post
+      withRequestLogging(call) { body, captureBody, captureResponse, logId, _, prefs ->
+        anthropicEndpointHandlers.handleMessages(body, captureBody, captureResponse, logId, prefs)
       }
     }
 

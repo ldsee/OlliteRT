@@ -281,6 +281,146 @@ object AnthropicConverter {
     )
   }
 
+  // ── Response side ───────────────────────────────────────────────────────────
+
+  /**
+   * Re-shape a serialized OpenAI [ChatResponse] body into an Anthropic
+   * [AnthropicMessagesResponse] body.
+   *
+   * Why JSON-in / JSON-out instead of typed-in / JSON-out: the existing
+   * [EndpointHandlers.runChatCompletion] core captures the OAI response as a
+   * String and feeds it back into `captureResponse(...)`. The Anthropic handler
+   * supplies an adapter that calls this function so the captured Anthropic body
+   * matches the body actually returned to the client.
+   *
+   *   - `content` is built from the assistant message's `content` (text) and
+   *     `tool_calls` (one `tool_use` block per call). A leading `<think>...</think>`
+   *     segment becomes a separate `thinking` block.
+   *   - `stop_reason` is mapped from the OAI `finish_reason`. When the caller
+   *     observed a stop-sequence match, [matchedStopSequence] takes precedence
+   *     and produces `stop_reason="stop_sequence"` with the matched text in
+   *     the top-level `stop_sequence` field.
+   *   - `id` defaults to `msg_<requestId>` when supplied so log entries cross-link.
+   */
+  fun toAnthropicResponse(
+    json: Json,
+    oaiResponseBody: String,
+    requestedModelId: String,
+    requestId: String? = null,
+    matchedStopSequence: String? = null,
+  ): String {
+    val root = try {
+      json.parseToJsonElement(oaiResponseBody).jsonObject
+    } catch (e: Exception) {
+      // Caller already returned this string; treat parse failure as opaque api_error.
+      throw AnthropicConversionError("api_error", "Failed to re-shape upstream response: ${e.message}")
+    }
+    // Every field below is null-tolerant: kotlinx.serialization with encodeDefaults=true
+    // emits "tool_calls":null, "usage":null, "logprobs":null, etc. on the wire, and
+    // calling .jsonArray / .jsonObject on a JsonNull throws at runtime
+    // ("Element class kotlinx.serialization.json.JsonNull is not a JsonArray").
+    fun JsonElement?.asObjectOrNull(): JsonObject? = (this as? JsonObject)
+    fun JsonElement?.asArrayOrNull(): JsonArray? = (this as? JsonArray)
+    fun JsonElement?.asPrimitiveOrNull(): JsonPrimitive? = (this as? JsonPrimitive)?.takeUnless { it is JsonNull }
+
+    val msgId = requestId?.let { "msg_$it" } ?: root["id"].asPrimitiveOrNull()?.content ?: "msg_unknown"
+    val responseModel = root["model"].asPrimitiveOrNull()?.content ?: requestedModelId
+    val choice = root["choices"].asArrayOrNull()?.firstOrNull().asObjectOrNull()
+    val message = choice?.get("message").asObjectOrNull()
+    val rawText = message?.get("content").asPrimitiveOrNull()?.content.orEmpty()
+    val toolCalls = message?.get("tool_calls").asArrayOrNull()
+    val oaiFinish = choice?.get("finish_reason").asPrimitiveOrNull()?.content ?: FinishReason.STOP
+
+    val (thinkingText, visibleText) = splitThinkingAndText(rawText)
+
+    val contentBlocks = buildJsonArray {
+      if (thinkingText.isNotEmpty()) {
+        add(buildJsonObject {
+          put("type", "thinking")
+          put("thinking", thinkingText)
+          put("signature", "")
+        })
+      }
+      if (visibleText.isNotEmpty()) {
+        add(buildJsonObject {
+          put("type", "text")
+          put("text", visibleText)
+        })
+      }
+      if (toolCalls != null) {
+        for (call in toolCalls) {
+          val callObj = call.asObjectOrNull() ?: continue
+          val function = callObj["function"].asObjectOrNull() ?: continue
+          val name = function["name"].asPrimitiveOrNull()?.content ?: continue
+          val argsRaw = function["arguments"].asPrimitiveOrNull()?.content.orEmpty()
+          val parsedArgs = parseArgumentsAsJson(json, argsRaw)
+          add(buildJsonObject {
+            put("type", "tool_use")
+            put("id", callObj["id"].asPrimitiveOrNull()?.content ?: "toolu_unknown")
+            put("name", name)
+            put("input", parsedArgs)
+          })
+        }
+      }
+    }
+
+    val stopReason = mapStopReason(oaiFinish, matchedStopSequence != null)
+    val usage = root["usage"].asObjectOrNull()
+    val inputTokens = usage?.get("prompt_tokens").asPrimitiveOrNull()?.content?.toIntOrNull() ?: 0
+    val outputTokens = usage?.get("completion_tokens").asPrimitiveOrNull()?.content?.toIntOrNull() ?: 0
+
+    val payload = buildJsonObject {
+      put("id", msgId)
+      put("type", "message")
+      put("role", "assistant")
+      put("model", responseModel)
+      put("content", contentBlocks)
+      put("stop_reason", stopReason)
+      if (matchedStopSequence != null && stopReason == "stop_sequence") {
+        put("stop_sequence", matchedStopSequence)
+      } else {
+        put("stop_sequence", JsonNull)
+      }
+      put("usage", buildJsonObject {
+        put("input_tokens", inputTokens)
+        put("output_tokens", outputTokens)
+        put("cache_creation_input_tokens", 0)
+        put("cache_read_input_tokens", 0)
+      })
+    }
+    return payload.toString()
+  }
+
+  /**
+   * Split `<think>...</think>RESPONSE` into (thinking, response). The blocking
+   * inference path injects literal think tags into the OAI response text; the
+   * Anthropic format wants them as a separate content block.
+   */
+  internal fun splitThinkingAndText(raw: String): Pair<String, String> {
+    if (!raw.startsWith("<think>")) return "" to raw
+    val close = raw.indexOf("</think>")
+    if (close < 0) return "" to raw
+    val thinking = raw.substring("<think>".length, close)
+    val rest = raw.substring(close + "</think>".length)
+    return thinking to rest
+  }
+
+  private fun parseArgumentsAsJson(json: Json, raw: String): JsonElement {
+    if (raw.isBlank()) return JsonObject(emptyMap())
+    return try {
+      json.parseToJsonElement(raw)
+    } catch (_: Exception) {
+      JsonObject(emptyMap())
+    }
+  }
+
+  private fun mapStopReason(oaiFinish: String, stopSequenceTriggered: Boolean): String = when {
+    stopSequenceTriggered -> "stop_sequence"
+    oaiFinish == FinishReason.LENGTH -> "max_tokens"
+    oaiFinish == FinishReason.TOOL_CALLS -> "tool_use"
+    else -> "end_turn"
+  }
+
   /**
    * Translate Anthropic `tool_choice` (always an object) into an OAI-shape
    * [JsonElement]. The downstream [PromptBuilder.resolveToolChoice] then flattens
