@@ -953,6 +953,12 @@ class InferenceRunner(
     var firstTokenMs = 0L
     var inferenceStarted = false
     var inferenceCompleted = false
+    // True once ServerMetrics.onInferenceCompleted has been called for this request.
+    // Tracked separately from inferenceCompleted because the metric decrement and the
+    // local "we are done emitting" flag have different lifetimes — the metric pairs
+    // with onInferenceStarted and must fire at most once even if both the gateway
+    // callback and the safety-net finally try to clear it.
+    var metricsCompleted = false
     var stopSequenceTriggered = false
     // The actual stop string that matched, set in lock-step with stopSequenceTriggered.
     // Anthropic /v1/messages echoes this back in the response `stop_sequence` field;
@@ -968,6 +974,20 @@ class InferenceRunner(
 
     fun markCompleted() {
       inferenceCompleted = true
+    }
+
+    /**
+     * Idempotently decrement the inferring counter. Called from the gateway's
+     * onInferenceFinished callback in the normal path, and from the streamInference
+     * finally block as a safety net. Without the idempotent guard, an exception
+     * that bypasses onInferenceFinished would leak the counter and pin the
+     * "processing" pill on indefinitely.
+     */
+    fun markMetricsCompleted() {
+      if (inferenceStarted && !metricsCompleted) {
+        metricsCompleted = true
+        ServerMetrics.onInferenceCompleted()
+      }
     }
 
     fun buildCancelledPartial(): String? {
@@ -1419,7 +1439,7 @@ class InferenceRunner(
           if (originalConfig != null && model.instance != null) {
             model.configValues = originalConfig
           }
-          if (state.inferenceStarted) ServerMetrics.onInferenceCompleted()
+          state.markMetricsCompleted()
         },
         onCaughtThrowable = { t -> emitDebugStackTrace(t, format.sourceTag, model.name) },
       )
@@ -1481,8 +1501,12 @@ class InferenceRunner(
         logEvent("request_cancelled id=$requestId endpoint=$endpoint streaming=true outputChars=${state.fullText.length}")
       } finally {
         // Safety net: guarantee isInferring flag is cleared even if an unexpected
-        // exception bypasses normal completion/cancellation paths.
+        // exception bypasses normal completion/cancellation paths. markCompleted
+        // flips the local emitting-done flag; markMetricsCompleted decrements
+        // the ServerMetrics counter idempotently so the "processing" pill clears
+        // even when onInferenceFinished was never reached.
         state.markCompleted()
+        state.markMetricsCompleted()
       }
     }
   }
