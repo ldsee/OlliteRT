@@ -1617,10 +1617,29 @@ class InferenceRunner(
         }
       } catch (_: kotlinx.coroutines.CancellationException) {
         // Ktor cancelled the coroutine (client disconnect or withTimeout expired) — clean up
-        if (logId != null) RequestLogStore.unregisterCancellation(logId)
         ServerLlmModelHelper.stopResponse(model)
         channel.close()
-        logEvent("request_cancelled id=$requestId endpoint=$endpoint streaming=true outputChars=${state.fullText.length}")
+        if (!state.inferenceCompleted) {
+          // Finalize the log entry (isPending=false, isCancelled, 499) so it doesn't
+          // stay stuck "generating", then emit the format's terminating sequence
+          // (footer + [DONE]/message_stop) so a client still reading the stream gets a
+          // clean close instead of hanging. On a genuine client disconnect the socket is
+          // already dead and the emit throws harmlessly; on a server-side timeout the
+          // socket is alive and the client sees proper closure. The emit runs under
+          // NonCancellable because the surrounding coroutine context is already cancelled
+          // here, which would otherwise make the suspending emit calls throw immediately.
+          state.markCompleted()
+          state.logCancellation()
+          try {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+              format.emitCancellation(writer, state.headerWritten)
+            }
+          } catch (e: Exception) {
+            Log.w(TAG, "emitCancellation failed after stream cancellation for $requestId", e)
+          }
+        } else if (logId != null) {
+          RequestLogStore.unregisterCancellation(logId)
+        }
       } finally {
         // Safety net: guarantee isInferring flag is cleared even if an unexpected
         // exception bypasses normal completion/cancellation paths. markCompleted
