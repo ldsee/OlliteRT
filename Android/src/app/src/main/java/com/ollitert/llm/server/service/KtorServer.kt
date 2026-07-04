@@ -295,7 +295,10 @@ class KtorServer(
         // Timeout prevents indefinite hang if cancelProcess fails in the streaming handler.
         respondTextWriter(contentType = ContentType.Text.EventStream) {
           kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
-            kotlinx.coroutines.withTimeout(150_000L) {
+            // Outer safety-net timeout from the response itself (derived from the
+            // user's configurable per-endpoint timeout). Must exceed the inner
+            // streaming timeout so it only fires if inner cleanup hangs.
+            kotlinx.coroutines.withTimeout(resp.outerTimeoutMs) {
               val writer = KtorSseWriterImpl(this@respondTextWriter)
               resp.writer(writer)
             }

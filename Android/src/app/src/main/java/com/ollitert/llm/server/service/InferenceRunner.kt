@@ -1442,7 +1442,12 @@ class InferenceRunner(
     val streamPreview = prefs?.streamLogsPreview ?: ServerPrefs.isStreamLogsPreview(context)
     val keepPartial = prefs?.keepPartialResponse ?: ServerPrefs.isKeepPartialResponse(context)
 
-    return HttpResponse.Sse { writer ->
+    // Outer Ktor-writer safety timeout: one extra safety buffer beyond the inner
+    // channel-consumption timeout below, so the outer net only fires if the inner
+    // timeout + cleanup fails to unwind. Both derive from the user's configurable
+    // per-endpoint timeout, so raising the setting raises this cap too.
+    val outerTimeoutMs = (timeoutSeconds + 2 * STREAM_OUTER_TIMEOUT_SAFETY_BUFFER_SECONDS) * 1000
+    return HttpResponse.Sse(outerTimeoutMs = outerTimeoutMs) { writer ->
       val channel = Channel<StreamEvent>(Channel.UNLIMITED)
       channelRef.set(channel)
       val state = StreamState(model, requestId, endpoint, logId, streamStartMs, keepPartial)

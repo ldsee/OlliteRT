@@ -79,6 +79,11 @@ const val BLOCKING_TIMEOUT_SECONDS = 30L
 // Without the buffer, both timeouts race and gateway-bug hangs are masked.
 // See `InferenceRunner.streamInference` outer wrapper.
 const val STREAM_OUTER_TIMEOUT_SAFETY_BUFFER_SECONDS = 30L
+// Fallback outer-timeout (ms) for SSE responses that don't run real inference
+// (empty-stream shortcuts in EndpointHandlers). Real streaming responses override
+// this with a value derived from the user's configurable per-endpoint timeout.
+// Large enough to never fire in practice for the trivial empty-stream case.
+const val DEFAULT_SSE_OUTER_TIMEOUT_MS = 150_000L
 // Interval between SSE ping events sent during long prefill. Anthropic's Messages
 // streaming spec documents `event: ping` as a connection-keepalive signal that may
 // be dispersed throughout the response. Without it, Anthropic SDK clients (e.g.
