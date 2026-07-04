@@ -3,13 +3,13 @@
   "extends": ["config:recommended"],
   "dependencyDashboard": false,
   "labels": ["dependencies"],
+  "enabledManagers": ["gradle"],
   "packageRules": [
     {
-      "matchManagers": ["gradle"],
+      "matchPackageNames": ["!com.google.ai.edge.litertlm:**"],
       "enabled": false
     },
     {
-      "matchManagers": ["gradle"],
       "matchPackageNames": ["com.google.ai.edge.litertlm:**"],
       "enabled": true,
       "groupName": "LiteRT-LM",
