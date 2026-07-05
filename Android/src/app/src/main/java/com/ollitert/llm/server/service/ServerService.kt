@@ -386,7 +386,15 @@ class ServerService : Service() {
     // socket synchronously first so we can fail cleanly with the expected error event.
     try {
       java.net.ServerSocket().use { probe ->
-        probe.reuseAddress = false
+        // SO_REUSEADDR must match what the real Ktor CIO server uses when it binds.
+        // With reuseAddress=false the probe is STRICTER than the actual server: it
+        // refuses to bind while a prior connection's socket lingers in TIME_WAIT
+        // (which happens after stopping the server while a request was in flight),
+        // producing a false "port in use" error even though no process is listening
+        // and the server would bind fine. reuseAddress=true still throws BindException
+        // when another process is actively LISTENing on the port (e.g. another flavor),
+        // so genuine collisions are still detected.
+        probe.reuseAddress = true
         probe.bind(java.net.InetSocketAddress("0.0.0.0", port))
       }
     } catch (e: java.io.IOException) {
